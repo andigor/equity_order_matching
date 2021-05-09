@@ -45,6 +45,10 @@ public:
   {
     return { m_time, m_price };
   }
+  void set_price(float p)
+  {
+    m_price = p;
+  }
 private:
   uint64_t m_id;
   uint32_t m_time;
@@ -67,6 +71,12 @@ public:
     ,m_ioc(ioc)
   {
 
+  }
+  order(float price, const order_data& d)
+    :m_order_data(d)
+  {
+    assert(m_order_data.get_price() == 0.0f);
+    m_order_data.set_price(price);
   }
   const order_data& get_data() const
   {
@@ -117,6 +127,11 @@ public:
 
   }
   
+  order_sell(float price, const order_data& od)
+    :order(price, od)
+  {
+
+  }
 };
 
 using limit_order_sell = order_sell;
@@ -126,6 +141,11 @@ class order_buy : public order<order_side::buy>
 public:
   order_buy(const order_data& od, bool ioc = false)
     :order(od, ioc)
+  {
+
+  }
+  order_buy(float price, const order_data& od)
+    :order(price, od)
   {
 
   }
@@ -309,6 +329,12 @@ public:
     }
     return false;
   }
+  float get_best_price() const
+  {
+    assert(!this->empty());
+    auto iter = this->begin();
+    return iter->second.get_price();
+  }
 private:
   using queue_iter = std::multimap<order_data_key, Ord, Cmp>::iterator;
   std::unordered_map<uint64_t, queue_iter> m_ids;
@@ -486,6 +512,15 @@ public:
   }
   void run_matching()
   {
+    // first check market orders
+    for (auto buy_iter = m_market_order_buy_cont.begin(); buy_iter != m_market_order_buy_cont.end(); ++buy_iter) {
+      if (m_limit_sell_queue.empty()) {
+        break;
+      }
+      auto best_price = m_limit_sell_queue.get_best_price();
+      order_data od = buy_iter->second;
+      limit_order_buy buy_order(best_price, od);
+    }
   }
 private:
   bool id_exists(uint64_t id) const
