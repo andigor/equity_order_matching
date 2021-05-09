@@ -321,9 +321,62 @@ void basic_buy_queue_tests()
   }
 }
 
+void basic_sell_queue_tests()
+{
+  {
+    limit_order_sell_queue bq;
+    limit_order_sell b1({ 1, 1, "n", 1.0f, 1 });
+    bq.put_order(b1);
+
+    limit_order_sell b2({ 2, 1, "n", 1.0f, 1 });
+    bq.put_order(b2);
+
+    assert(bq.size() == 2);
+    {
+      auto iter = bq.begin();
+      assert(iter->second.get_id() == 1);
+      ++iter;
+      assert(iter->second.get_id() == 2);
+    }
+  }
+  {
+    limit_order_sell_queue bq;
+    limit_order_sell b1({ 1, 2, "n", 1.0f, 1 });
+    bq.put_order(b1);
+
+    limit_order_sell b2({ 2, 1, "n", 1.0f, 1 });
+    bq.put_order(b2);
+
+    assert(bq.size() == 2);
+    {
+      auto iter = bq.begin();
+      assert(iter->second.get_id() == 2);
+      ++iter;
+      assert(iter->second.get_id() == 1);
+    }
+  }
+  {
+    limit_order_sell_queue bq;
+    limit_order_sell b1({ 1, 1, "n", 2.0f, 1 });
+    bq.put_order(b1);
+
+    limit_order_sell b2({ 2, 1, "n", 1.0f, 1 });
+    bq.put_order(b2);
+
+    assert(bq.size() == 2);
+    {
+      auto iter = bq.begin();
+      assert(iter->second.get_id() == 2);
+      ++iter;
+      assert(iter->second.get_id() == 1);
+    }
+  }
+}
+
 int main()
 {
 
   basic_limit_orders_matching_tests();
   basic_buy_queue_tests();
+  basic_sell_queue_tests();
 }
