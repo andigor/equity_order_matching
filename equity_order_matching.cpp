@@ -3,6 +3,8 @@
 #include <map>
 #include <cassert>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 struct order_data_key
 {
@@ -58,8 +60,9 @@ template <order_side OrderSide>
 class order
 {
 public:
-  order(const order_data& d)
+  order(const order_data& d, bool ioc)
     :m_order_data(d)
+    ,m_ioc(ioc)
   {
 
   }
@@ -94,25 +97,31 @@ public:
   {
     return m_order_data.get_id();
   }
+  bool is_ioc() const
+  {
+    return m_ioc;
+  }
 private:
   order_data m_order_data;
+  bool m_ioc = false;
 };
 
 class limit_order_sell : public order<order_side::sell>
 {
 public:
-  limit_order_sell(const order_data& od)
-    :order(od)
+  limit_order_sell(const order_data& od, bool ioc = false)
+    :order(od, ioc)
   {
 
   }
+  
 };
 
 class limit_order_buy : public order<order_side::buy>
 {
 public:
-  limit_order_buy(const order_data& od)
-    :order(od)
+  limit_order_buy(const order_data& od, bool ioc = false)
+    :order(od, ioc)
   {
 
   }
@@ -259,20 +268,36 @@ public:
     }
     auto iter = this->insert(std::make_pair(o.get_key(), o));
     m_ids.insert(std::make_pair(o.get_id(), iter));
+    if (o.is_ioc()) {
+      m_ioc.insert(o.get_id());
+    }
     return true;
   }
-  void cancel_order(uint64_t id)
+  void cancel_order(uint64_t id, bool check_ioc = true)
   {
     auto elem = m_ids.find(id);
     if (elem == m_ids.end()) {
       return;
     }
+    if (check_ioc) {
+      if (elem->is_ioc()) {
+        m_ioc.erase(id);
+      }
+    }
     this->erase(*elem);
     m_ids.erase(elem);
+  }
+  void drop_ioc()
+  {
+    for (auto id : m_ioc) {
+      cancel_order(id, false);
+    }
+    m_ioc.clear();
   }
 private:
   using queue_iter = std::multimap<order_data_key, Ord, Cmp>::iterator;
   std::unordered_map<uint64_t, queue_iter> m_ids;
+  std::unordered_set<uint64_t> m_ioc;
 };
 
 class limit_order_buy_queue: public limit_order_queue<limit_order_buy, limit_order_buy_less>
