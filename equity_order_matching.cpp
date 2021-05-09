@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <functional>
+#include <array>
 
 struct order_data_key
 {
@@ -51,7 +53,7 @@ private:
   uint64_t m_q;
 };
 
-enum class order_side{
+enum class order_side : int {
     sell
   , buy
 };
@@ -106,10 +108,10 @@ private:
   bool m_ioc = false;
 };
 
-class limit_order_sell : public order<order_side::sell>
+class order_sell : public order<order_side::sell>
 {
 public:
-  limit_order_sell(const order_data& od, bool ioc = false)
+  order_sell(const order_data& od, bool ioc = false)
     :order(od, ioc)
   {
 
@@ -117,15 +119,19 @@ public:
   
 };
 
-class limit_order_buy : public order<order_side::buy>
+using limit_order_sell = order_sell;
+
+class order_buy : public order<order_side::buy>
 {
 public:
-  limit_order_buy(const order_data& od, bool ioc = false)
+  order_buy(const order_data& od, bool ioc = false)
     :order(od, ioc)
   {
 
   }
 };
+
+using limit_order_buy = order_buy;
 
 
 struct limit_order_buy_less
@@ -273,11 +279,11 @@ public:
     }
     return true;
   }
-  void cancel_order(uint64_t id, bool check_ioc = true)
+  bool cancel_order(uint64_t id, bool check_ioc = true)
   {
     auto elem = m_ids.find(id);
     if (elem == m_ids.end()) {
-      return;
+      return false;
     }
     if (check_ioc) {
       if (elem->is_ioc()) {
@@ -286,6 +292,7 @@ public:
     }
     this->erase(*elem);
     m_ids.erase(elem);
+    return true;
   }
   void drop_ioc()
   {
@@ -416,12 +423,84 @@ void basic_sell_queue_tests()
   }
 }
 
+enum class order_type : int {
+    market
+  , limit
+  , limit_ioc
+};
 
+template <typename E>
+constexpr auto to_underlying(E e) noexcept
+{
+  return static_cast<std::underlying_type_t<E>>(e);
+}
 
+class order_engine
+{
+public:
+  order_engine()
+  {
+    init_put_func();
+  }
+
+  bool put_order(const order_data& d, order_side os, order_type ot)
+  {
+    assert(false);
+    return false;
+  }
+  void run_matching()
+  {
+
+  }
+private:
+  bool put_order_sell_market(const order_data& d)
+  {
+    return false;
+  }
+  bool put_order_sell_limit(const order_data& d)
+  {
+    return false;
+  }
+  bool put_order_sell_limit_ioc(const order_data& d)
+  {
+    return false;
+  }
+  bool put_order_buy_market(const order_data& d)
+  {
+    return false;
+  }
+  bool put_order_buy_limit(const order_data& d)
+  {
+    return false;
+  }
+  bool put_order_buy_limit_ioc(const order_data& d)
+  {
+    return false;
+  }
+  void init_put_func()
+  {
+    m_put_func.at(to_underlying(order_side::buy)).at(to_underlying(order_type::limit)) = [this](const auto& od) {return put_order_buy_limit(od); };
+    m_put_func.at(to_underlying(order_side::buy)).at(to_underlying(order_type::market)) = [this](const auto& od) {return put_order_buy_market(od); };
+    m_put_func.at(to_underlying(order_side::buy)).at(to_underlying(order_type::limit_ioc)) = [this](const auto& od) {return put_order_buy_limit_ioc(od); };
+
+    m_put_func.at(to_underlying(order_side::sell)).at(to_underlying(order_type::limit)) = [this](const auto& od) {return put_order_sell_limit(od); };
+    m_put_func.at(to_underlying(order_side::sell)).at(to_underlying(order_type::market)) = [this](const auto& od) {return put_order_sell_market(od); };
+    m_put_func.at(to_underlying(order_side::sell)).at(to_underlying(order_type::limit_ioc)) = [this](const auto& od) {return put_order_sell_limit_ioc(od); };
+  }
+  limit_order_buy_queue m_limit_buy_queue;
+  limit_order_sell_queue m_limit_sell_queue;
+
+  std::unordered_map<uint64_t, order_buy> m_market_order_buy;
+  std::unordered_map<uint64_t, order_sell> m_market_order_sell;
+
+  std::array<std::array<std::function<bool(const order_data&)>, 3>, 2> m_put_func;
+};
 
 int main()
 {
   basic_limit_orders_matching_tests();
   basic_buy_queue_tests();
   basic_sell_queue_tests();
+
+  order_engine eng;
 }
