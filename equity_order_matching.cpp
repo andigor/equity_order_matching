@@ -301,6 +301,14 @@ public:
     }
     m_ioc.clear();
   }
+  bool id_exists(uint64_t id) const
+  {
+    auto cnt = m_ids.count(id);
+    if (cnt > 0) {
+      return true;
+    }
+    return false;
+  }
 private:
   using queue_iter = std::multimap<order_data_key, Ord, Cmp>::iterator;
   std::unordered_map<uint64_t, queue_iter> m_ids;
@@ -317,6 +325,29 @@ class limit_order_sell_queue: public limit_order_queue<limit_order_sell, limit_o
 public:
 };
 
+
+template <order_side t_order_side>
+class market_order_cont : public std::unordered_map<uint64_t, order_data>
+{
+public:
+  bool id_exists(uint64_t id) const
+  {
+    auto cnt = count(id);
+    if (cnt > 0) {
+      return true;
+    }
+    return false;
+  }
+
+  bool put_order(const order_data& o)
+  {
+    auto ret = insert(std::make_pair(o.get_id(), o));
+    return ret.second;
+  }
+};
+
+using market_order_buy_cont = market_order_cont<order_side::buy>;
+using market_order_sell_cont = market_order_cont<order_side::sell>;
 
 void basic_buy_queue_tests()
 {
@@ -445,37 +476,65 @@ public:
 
   bool put_order(const order_data& d, order_side os, order_type ot)
   {
-    assert(false);
-    return false;
+    if (id_exists(d.get_id())) {
+      return false;
+    }
+
+    auto ret = m_put_func.at(to_underlying(ot)).at(to_underlying(os))(d);
+ 
+    return ret;
   }
   void run_matching()
   {
-
   }
 private:
+  bool id_exists(uint64_t id) const
+  {
+    // check all queues for the id
+    if (m_limit_buy_queue.id_exists(id)) {
+      return true;
+    }
+    if (m_limit_sell_queue.id_exists(id)) {
+      return true;
+    }
+
+    if (m_market_order_buy_cont.id_exists(id)) {
+      return true;
+    }
+    if (m_market_order_sell_cont.id_exists(id)) {
+      return true;
+    }
+    return false;
+  }
   bool put_order_sell_market(const order_data& d)
   {
-    return false;
+    auto ret = m_market_order_sell_cont.put_order(d);
+    return ret;
   }
   bool put_order_sell_limit(const order_data& d)
   {
-    return false;
+    auto ret = m_limit_sell_queue.put_order(limit_order_sell(d));
+    return ret;
   }
   bool put_order_sell_limit_ioc(const order_data& d)
   {
-    return false;
+    auto ret = m_limit_sell_queue.put_order(limit_order_sell(d, true));
+    return ret;
   }
   bool put_order_buy_market(const order_data& d)
   {
-    return false;
+    auto ret = m_market_order_buy_cont.put_order(d);
+    return ret;
   }
   bool put_order_buy_limit(const order_data& d)
   {
-    return false;
+    auto ret = m_limit_buy_queue.put_order(limit_order_buy(d));
+    return ret;
   }
   bool put_order_buy_limit_ioc(const order_data& d)
   {
-    return false;
+    auto ret = m_limit_buy_queue.put_order(limit_order_buy(d, true));
+    return ret;
   }
   void init_put_func()
   {
@@ -490,8 +549,8 @@ private:
   limit_order_buy_queue m_limit_buy_queue;
   limit_order_sell_queue m_limit_sell_queue;
 
-  std::unordered_map<uint64_t, order_buy> m_market_order_buy;
-  std::unordered_map<uint64_t, order_sell> m_market_order_sell;
+  market_order_buy_cont m_market_order_buy_cont;
+  market_order_sell_cont m_market_order_sell_cont;
 
   std::array<std::array<std::function<bool(const order_data&)>, 3>, 2> m_put_func;
 };
