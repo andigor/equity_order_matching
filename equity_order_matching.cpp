@@ -2,6 +2,7 @@
 #include <iostream>
 #include <map>
 #include <cassert>
+#include <unordered_map>
 
 struct order_data_key
 {
@@ -251,10 +252,27 @@ template <class Ord, class Cmp>
 class limit_order_queue : public std::multimap<order_data_key, Ord, Cmp>
 {
 public:
-  void put_order(const Ord& o)
+  bool put_order(const Ord& o)
   {
-    this->insert(std::make_pair(o.get_key(), o));
+    if (m_ids.count(o.get_id()) != 0) {
+      return false;
+    }
+    auto iter = this->insert(std::make_pair(o.get_key(), o));
+    m_ids.insert(std::make_pair(o.get_id(), iter));
+    return true;
   }
+  void cancel_order(uint64_t id)
+  {
+    auto elem = m_ids.find(id);
+    if (elem == m_ids.end()) {
+      return;
+    }
+    this->erase(*elem);
+    m_ids.erase(elem);
+  }
+private:
+  using queue_iter = std::multimap<order_data_key, Ord, Cmp>::iterator;
+  std::unordered_map<uint64_t, queue_iter> m_ids;
 };
 
 class limit_order_buy_queue: public limit_order_queue<limit_order_buy, limit_order_buy_less>
@@ -373,9 +391,11 @@ void basic_sell_queue_tests()
   }
 }
 
+
+
+
 int main()
 {
-
   basic_limit_orders_matching_tests();
   basic_buy_queue_tests();
   basic_sell_queue_tests();
