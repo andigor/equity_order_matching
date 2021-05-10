@@ -72,12 +72,6 @@ public:
   {
 
   }
-  order(float price, const order_data& d)
-    :m_order_data(d)
-  {
-    assert(m_order_data.get_price() == 0.0f);
-    m_order_data.set_price(price);
-  }
   const order_data& get_data() const
   {
     return m_order_data;
@@ -113,6 +107,10 @@ public:
   {
     return m_ioc;
   }
+  void set_price(float p)
+  {
+    m_order_data.set_price(p);
+  }
 private:
   order_data m_order_data;
   bool m_ioc = false;
@@ -127,11 +125,6 @@ public:
 
   }
   
-  order_sell(float price, const order_data& od)
-    :order(price, od)
-  {
-
-  }
 };
 
 using limit_order_sell = order_sell;
@@ -141,11 +134,6 @@ class order_buy : public order<order_side::buy>
 public:
   order_buy(const order_data& od, bool ioc = false)
     :order(od, ioc)
-  {
-
-  }
-  order_buy(float price, const order_data& od)
-    :order(price, od)
   {
 
   }
@@ -335,6 +323,18 @@ public:
     auto iter = this->begin();
     return iter->second.get_price();
   }
+  Ord& top_order()
+  {
+    assert(!this->empty());
+    auto iter = this->begin();
+    return iter->second;
+  }
+  void pop_order()
+  {
+    assert(!this->empty());
+    auto iter = this->begin();
+    this->erase(iter);
+  }
 private:
   using queue_iter = std::multimap<order_data_key, Ord, Cmp>::iterator;
   std::unordered_map<uint64_t, queue_iter> m_ids;
@@ -352,28 +352,28 @@ public:
 };
 
 
-template <order_side t_order_side>
-class market_order_cont : public std::unordered_map<uint64_t, order_data>
+template <class Ord>
+class market_order_cont : public std::unordered_map<uint64_t, Ord>
 {
 public:
   bool id_exists(uint64_t id) const
   {
-    auto cnt = count(id);
+    auto cnt = this->count(id);
     if (cnt > 0) {
       return true;
     }
     return false;
   }
 
-  bool put_order(const order_data& o)
+  bool put_order(const Ord& o)
   {
-    auto ret = insert(std::make_pair(o.get_id(), o));
+    auto ret = this->insert(std::make_pair(o.get_id(), o));
     return ret.second;
   }
 };
 
-using market_order_buy_cont = market_order_cont<order_side::buy>;
-using market_order_sell_cont = market_order_cont<order_side::sell>;
+using market_order_buy_cont = market_order_cont<limit_order_buy>;
+using market_order_sell_cont = market_order_cont<limit_order_sell>;
 
 void basic_buy_queue_tests()
 {
@@ -512,14 +512,62 @@ public:
   }
   void run_matching()
   {
-    // first check market orders
-    for (auto buy_iter = m_market_order_buy_cont.begin(); buy_iter != m_market_order_buy_cont.end(); ++buy_iter) {
-      if (m_limit_sell_queue.empty()) {
-        break;
+    {
+      // first check market orders
+      std::vector<market_order_buy_cont::iterator> market_buy_orders_to_remove;
+      for (auto buy_iter = m_market_order_buy_cont.begin(); buy_iter != m_market_order_buy_cont.end(); ) {
+        if (m_limit_sell_queue.empty()) {
+          break;
+        }
+        auto best_price = m_limit_sell_queue.get_best_price();
+        limit_order_buy& market_buy_order = buy_iter->second;
+        market_buy_order.set_price(best_price);
+        auto& sell_order = m_limit_sell_queue.top_order();
+        auto match_result = match_limit_orders(market_buy_order, sell_order);
+        if (match_result.m_count_buy) {
+          // buy market buy order is fully matched, move to the next market buy order
+          market_buy_orders_to_remove.push_back(buy_iter);
+          ++buy_iter;
+        }
+        if (match_result.m_count_sell) {
+          //limit sell order is fully matched, remove it from the queue
+          m_limit_sell_queue.pop_order();
+        }
       }
-      auto best_price = m_limit_sell_queue.get_best_price();
-      order_data od = buy_iter->second;
-      limit_order_buy buy_order(best_price, od);
+      for (auto iter : market_buy_orders_to_remove) {
+        m_market_order_buy_cont.erase(iter);
+      }
+    }
+    {
+      // check market sell orders
+      std::vector<market_order_sell_cont::iterator> market_sell_orders_to_remove;
+
+      for (auto sell_iter = m_market_order_sell_cont.begin(); sell_iter != m_market_order_sell_cont.end(); ) {
+        if (m_limit_buy_queue.empty()) {
+          break;
+        }
+
+        auto best_price = m_limit_buy_queue.get_best_price();
+        limit_order_sell& market_sell_order = sell_iter->second;
+        market_sell_order.set_price(best_price);
+
+        auto& buy_order = m_limit_buy_queue.top_order();
+
+        auto match_result = match_limit_orders(buy_order, market_sell_order);
+        if (match_result.m_count_buy) {
+          // buy market buy order is fully matched, move to the next market buy order
+
+          m_limit_buy_queue.pop_order();
+        }
+        if (match_result.m_count_sell) {
+          //limit sell order is fully matched, remove it from the queue
+          market_sell_orders_to_remove.push_back(sell_iter);
+          ++sell_iter;
+        }
+      }
+      for (auto iter : market_sell_orders_to_remove) {
+        m_market_order_sell_cont.erase(iter);
+      }
     }
   }
 private:
