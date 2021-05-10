@@ -175,6 +175,11 @@ struct match_result
 {
   uint64_t m_count_buy = 0;
   uint64_t m_count_sell = 0;
+
+  bool no_match() const
+  {
+    return m_count_buy == 0 && m_count_sell == 0;
+  }
 };
 
 match_result make_buy_match_result(uint64_t matched_buy_count)
@@ -294,11 +299,11 @@ public:
       return false;
     }
     if (check_ioc) {
-      if (elem->is_ioc()) {
+      if (elem->second->second.is_ioc()) {
         m_ioc.erase(id);
       }
     }
-    this->erase(*elem);
+    this->erase(elem->second);
     m_ids.erase(elem);
     return true;
   }
@@ -568,6 +573,36 @@ public:
       for (auto iter : market_sell_orders_to_remove) {
         m_market_order_sell_cont.erase(iter);
       }
+    }
+    {
+      // now match limit orders
+      for (;;) {
+        if (m_limit_buy_queue.empty()) {
+          break;
+        }
+        if (m_limit_sell_queue.empty()) {
+          break;
+        }
+        auto& buy_order = m_limit_buy_queue.top_order();
+        auto& sell_order = m_limit_sell_queue.top_order();
+        auto match_result = match_limit_orders(buy_order, sell_order);
+        if (match_result.no_match()) {
+          break;
+        }
+        if (match_result.m_count_buy) {
+          // buy order fully matched
+          m_limit_buy_queue.pop_order();
+        }
+        if (match_result.m_count_sell) {
+          // sell order fully matched
+          m_limit_sell_queue.pop_order();
+        }
+      }
+    }
+    {
+      // cancel all ioc orders
+      m_limit_buy_queue.drop_ioc();
+      m_limit_sell_queue.drop_ioc();
     }
   }
 private:
