@@ -411,6 +411,15 @@ public:
     auto ret = this->insert(std::make_pair(o.get_id(), o));
     return ret.second;
   }
+  bool cancel_order(uint64_t id)
+  {
+    auto iter = this->find(id);
+    if (iter == this->end()) {
+      return false;
+    }
+    this->erase(iter);
+    return true;
+  }
 };
 
 using market_order_buy_cont = market_order_cont<limit_order_buy>;
@@ -587,7 +596,22 @@ public:
     return false;
   }
 
-  
+  bool cancel_order(uint64_t id)
+  {
+    if (m_limit_buy_queue.cancel_order(id)) {
+      return true;
+    }
+    if (m_limit_sell_queue.cancel_order(id)) {
+      return true;
+    }
+    if (m_market_order_buy_cont.cancel_order(id)) {
+      return true;
+    }
+    if (m_market_order_sell_cont.cancel_order(id)) {
+      return true;
+    }
+    return false;
+  }
 
   void run_matching()
   {
@@ -680,6 +704,7 @@ public:
     }
   }
 private:
+
   enum class amend_result {
     not_found
     , failed
@@ -914,6 +939,25 @@ private:
   uint64_t m_order_id;
 };
 
+class cancel_not_found_error : public parse_error
+{
+public:
+  cancel_not_found_error(uint64_t order_id)
+    :m_order_id(order_id)
+  {
+
+  }
+  std::string get_msg() const override
+  {
+    std::string msg;
+    msg += '<';
+    msg += std::to_string(m_order_id);
+    msg += "> - CancelReject - 404 - Order does not exist";
+    return msg;
+  }
+private:
+  uint64_t m_order_id;
+};
 class order_engines //: public 
 {
 public:
@@ -951,7 +995,16 @@ public:
       throw amend_parse_error(od.get_id());
     }
   }
-
+  bool cancel_order(uint64_t id)
+  {
+    auto symb_iter = m_symbols.find(id);
+    if (symb_iter == m_symbols.end()) {
+      throw cancel_not_found_error(id);
+    }
+    auto eng_iter = m_engines.find(symb_iter->second);
+    assert(eng_iter != m_engines.end());
+    return eng_iter->second.cancel_order(id);
+  }
 private:
   uint32_t m_current_time = 0;
   std::unordered_map<std::string, order_engine> m_engines;
@@ -1032,6 +1085,15 @@ order_data parse_amend_order_string(const std::string& line)
   return parse_new_order_string(line);
 }
 
+uint64_t parse_cancel_string(const std::string& line)
+{
+  auto tok = split_string(line);
+  assert(tok.size() == 3);
+
+  auto id = std::stoull(tok[2]);
+  return id;
+}
+
 int main()
 {
   basic_limit_orders_matching_tests();
@@ -1058,7 +1120,11 @@ int main()
         break;
       }
       case 'X':
+      {
+        uint64_t id = parse_cancel_string(line);
+        engines.cancel_order(id);
         break;
+      }
       case 'M':
         break;
       case 'Q':
