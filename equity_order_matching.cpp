@@ -7,6 +7,7 @@
 #include <vector>
 #include <functional>
 #include <array>
+#include <string>
 
 struct order_data_key
 {
@@ -14,15 +15,28 @@ struct order_data_key
   float m_price;
 };
 
+enum class order_side : int {
+    sell
+  , buy
+};
+
+enum class order_type : int {
+    market
+  , limit
+  , limit_ioc
+};
+
 class order_data
 {
 public:
-  order_data(uint64_t id, uint32_t tim, const std::string& nam, float price, uint64_t q)
+  order_data(uint64_t id, uint32_t tim, const std::string& nam, float price, uint64_t q, order_side os, order_type ot)
   : m_id(id)
   , m_time(tim)
   , m_symbol(nam)
   , m_price(price)
   , m_q(q)
+  , m_order_side(os)
+  , m_order_type(ot)
   {
   }
 
@@ -49,18 +63,24 @@ public:
   {
     m_price = p;
   }
+  order_side get_order_side() const
+  {
+    return m_order_side;
+  }
+  order_type get_order_type() const
+  {
+    return m_order_type;
+  }
 private:
   uint64_t m_id;
   uint32_t m_time;
   std::string m_symbol;
   float m_price;
   uint64_t m_q;
+  order_side m_order_side;
+  order_type m_order_type;
 };
 
-enum class order_side : int {
-    sell
-  , buy
-};
 
 template <order_side OrderSide>
 class order
@@ -673,11 +693,32 @@ private:
   std::array<std::array<std::function<bool(const order_data&)>, 3>, 2> m_put_func;
 };
 
+//order_data
+
 int main()
 {
   basic_limit_orders_matching_tests();
   basic_buy_queue_tests();
   basic_sell_queue_tests();
+
+  std::string line;
+  while (std::getline(std::cin, line)) {
+    if (line.size() == 0) {
+      assert(false);
+    }
+    switch (line[0]) {
+    case 'N':
+      break;
+    case 'A':
+      break;
+    case 'X':
+      break;
+    case 'M':
+      break;
+    case 'Q':
+      break;
+    }
+  }
 
   order_engine eng;
 }
