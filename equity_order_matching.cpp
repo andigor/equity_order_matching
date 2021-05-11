@@ -1005,9 +1005,21 @@ public:
     assert(eng_iter != m_engines.end());
     return eng_iter->second.cancel_order(id);
   }
+  void match_one(const std::string& symb)
+  {
+    auto iter = m_engines.find(symb);
+    assert(iter != m_engines.end());
+    iter->second.run_matching();
+  }
+  void match_all()
+  {
+    for (auto& eng : m_engines) {
+      eng.second.run_matching();
+    }
+  }
 private:
   uint32_t m_current_time = 0;
-  std::unordered_map<std::string, order_engine> m_engines;
+  std::map<std::string, order_engine> m_engines;
   std::unordered_map<uint64_t, std::string> m_symbols;
 };
 
@@ -1094,6 +1106,20 @@ uint64_t parse_cancel_string(const std::string& line)
   return id;
 }
 
+std::string parse_match_string(const std::string& line)
+{
+  auto tok = split_string(line);
+  if (tok.size() == 2) {
+    return std::string();
+  }
+  else if (tok.size() == 3) {
+    return std::string(tok[2]);
+  }
+  assert(false);
+  return std::string();
+}
+
+
 int main()
 {
   basic_limit_orders_matching_tests();
@@ -1126,7 +1152,16 @@ int main()
         break;
       }
       case 'M':
+      {
+        std::string match_string = parse_match_string(line);
+        if (!match_string.empty()) {
+          engines.match_one(match_string);
+        }
+        else {
+          engines.match_all();
+        }
         break;
+      }
       case 'Q':
         break;
       }
