@@ -562,6 +562,7 @@ constexpr auto to_underlying(E e) noexcept
 
 struct matched_result_detail
 {
+  std::string m_symb;
   struct matched_buy {
     uint64_t m_order_id;
     order_type m_order_type;
@@ -607,11 +608,11 @@ struct matched_result_detail
   matched_buy m_matched_buy;
   matched_sell m_matched_sell;
 
-  std::string to_string(const std::string& symb) const
+  std::string to_string() const
   {
     std::string ret;
 
-    ret += symb;
+    ret += m_symb;
     ret += '|';
     ret += m_matched_buy.to_string();
     ret += '|';
@@ -796,6 +797,8 @@ private:
   matched_result_detail fill_details(const order_sell& sell_order, const order_buy& buy_order, uint64_t matched_count) const
   {
     matched_result_detail det;
+
+    det.m_symb = sell_order.get_data().get_symbol();
 
     det.m_matched_buy.m_order_id = buy_order.get_id();
     det.m_matched_buy.m_order_type = buy_order.get_data().get_order_type();
@@ -1262,11 +1265,16 @@ int main()
       case 'M':
       {
         std::string match_string = parse_match_string(line);
+        std::vector<matched_result_detail> result;
         if (!match_string.empty()) {
-          engines.match_one(match_string);
+          result = engines.match_one(match_string);
         }
         else {
-          engines.match_all();
+          result = engines.match_all();
+        }
+
+        for (const auto& res : result) {
+          std::cout << res.to_string() << std::endl;
         }
         break;
       }
