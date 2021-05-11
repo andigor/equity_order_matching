@@ -8,6 +8,8 @@
 #include <functional>
 #include <array>
 #include <string>
+#include <cassert>
+#include <sstream>
 
 struct order_data_key
 {
@@ -41,7 +43,7 @@ public:
   }
 
   uint64_t get_id()        const { return m_id; }
-  int get_time()           const { return m_time; }
+  uint32_t get_time()      const { return m_time; }
   std::string get_symbol() const { return m_symbol; }
   float get_price()        const { return m_price; }
   uint64_t get_q()         const { return m_q; }
@@ -54,6 +56,10 @@ public:
   void reset_q()
   {
     m_q = 0;
+  }
+  void set_q(uint64_t q)
+  {
+    m_q = q;
   }
   order_data_key get_key() const
   {
@@ -106,6 +112,10 @@ public:
   void reset_q()
   {
     m_order_data.reset_q();
+  }
+  void set_q(uint64_t q)
+  {
+    m_order_data.set_q(q);
   }
   float get_price() const
   {
@@ -243,8 +253,8 @@ match_result match_limit_orders(limit_order_buy& buy, limit_order_sell& sell)
 void basic_limit_orders_matching_tests()
 {
   {
-    limit_order_buy order_buy({1, 1, "a", 1.0f, 1});
-    limit_order_sell order_sell({1, 1, "a", 1.0f, 1});
+    limit_order_buy order_buy({1, 1, "a", 1.0f, 1, order_side::buy, order_type::limit});
+    limit_order_sell order_sell({1, 1, "a", 1.0f, 1, order_side::sell, order_type::limit});
 
     auto res = match_limit_orders(order_buy, order_sell);
 
@@ -252,8 +262,8 @@ void basic_limit_orders_matching_tests()
     assert(res.m_count_sell == 1);
   }
   {
-    limit_order_buy order_buy({1, 1, "a", 2.0f, 1});
-    limit_order_sell order_sell({1, 1, "a", 1.0f, 1});
+    limit_order_buy order_buy({1, 1, "a", 2.0f, 1, order_side::buy, order_type::limit});
+    limit_order_sell order_sell({1, 1, "a", 1.0f, 1, order_side::sell, order_type::limit});
 
     auto res = match_limit_orders(order_buy, order_sell);
 
@@ -261,8 +271,8 @@ void basic_limit_orders_matching_tests()
     assert(res.m_count_sell == 1);
   }
   {
-    limit_order_buy order_buy({1, 1, "a", 1.0f, 1});
-    limit_order_sell order_sell({1, 1, "a", 2.0f, 1});
+    limit_order_buy order_buy({1, 1, "a", 1.0f, 1, order_side::buy, order_type::limit});
+    limit_order_sell order_sell({1, 1, "a", 2.0f, 1, order_side::sell, order_type::limit});
 
     auto res = match_limit_orders(order_buy, order_sell);
 
@@ -270,8 +280,8 @@ void basic_limit_orders_matching_tests()
     assert(res.m_count_sell == 0);
   }
   {
-    limit_order_buy order_buy({1, 1, "a", 2.0f, 2});
-    limit_order_sell order_sell({1, 1, "a", 1.0f, 1});
+    limit_order_buy order_buy({1, 1, "a", 2.0f, 2, order_side::buy, order_type::limit});
+    limit_order_sell order_sell({1, 1, "a", 1.0f, 1, order_side::sell, order_type::limit});
 
     auto res = match_limit_orders(order_buy, order_sell);
 
@@ -282,8 +292,8 @@ void basic_limit_orders_matching_tests()
     assert(order_sell.get_q() == 0);
   }
   {
-    limit_order_buy order_buy({1, 1, "a", 2.0f, 1});
-    limit_order_sell order_sell({1, 1, "a", 1.0f, 2});
+    limit_order_buy order_buy({1, 1, "a", 2.0f, 1, order_side::buy, order_type::limit});
+    limit_order_sell order_sell({1, 1, "a", 1.0f, 2, order_side::sell, order_type::limit});
 
     auto res = match_limit_orders(order_buy, order_sell);
 
@@ -360,8 +370,14 @@ public:
     auto iter = this->begin();
     this->erase(iter);
   }
-private:
+
   using queue_iter = std::multimap<order_data_key, Ord, Cmp>::iterator;
+  queue_iter find_order_iter(uint64_t ord_id)
+  {
+    auto iter = m_ids.find(ord_id);
+    return iter->second;
+  }
+private:
   std::unordered_map<uint64_t, queue_iter> m_ids;
   std::unordered_set<uint64_t> m_ioc;
 };
@@ -404,10 +420,10 @@ void basic_buy_queue_tests()
 {
   {
     limit_order_buy_queue bq;
-    limit_order_buy b1({ 1, 1, "n", 1.0f, 1 });
+    limit_order_buy b1({ 1, 1, "n", 1.0f, 1, order_side::buy, order_type::limit});
     bq.put_order(b1);
 
-    limit_order_buy b2({ 2, 1, "n", 1.0f, 1 });
+    limit_order_buy b2({ 2, 1, "n", 1.0f, 1, order_side::buy, order_type::limit});
     bq.put_order(b2);
 
     assert(bq.size() == 2);
@@ -420,10 +436,10 @@ void basic_buy_queue_tests()
   }
   {
     limit_order_buy_queue bq;
-    limit_order_buy b1({ 1, 2, "n", 1.0f, 1 });
+    limit_order_buy b1({ 1, 2, "n", 1.0f, 1, order_side::buy, order_type::limit });
     bq.put_order(b1);
 
-    limit_order_buy b2({ 2, 1, "n", 1.0f, 1 });
+    limit_order_buy b2({ 2, 1, "n", 1.0f, 1, order_side::buy, order_type::limit });
     bq.put_order(b2);
 
     assert(bq.size() == 2);
@@ -437,10 +453,10 @@ void basic_buy_queue_tests()
 
   {
     limit_order_buy_queue bq;
-    limit_order_buy b1({ 1, 1, "n", 2.0f, 1 });
+    limit_order_buy b1({ 1, 1, "n", 2.0f, 1, order_side::buy, order_type::limit });
     bq.put_order(b1);
 
-    limit_order_buy b2({ 2, 1, "n", 1.0f, 1 });
+    limit_order_buy b2({ 2, 1, "n", 1.0f, 1, order_side::buy, order_type::limit });
     bq.put_order(b2);
 
     assert(bq.size() == 2);
@@ -457,10 +473,10 @@ void basic_sell_queue_tests()
 {
   {
     limit_order_sell_queue bq;
-    limit_order_sell b1({ 1, 1, "n", 1.0f, 1 });
+    limit_order_sell b1({ 1, 1, "n", 1.0f, 1, order_side::sell, order_type::limit });
     bq.put_order(b1);
 
-    limit_order_sell b2({ 2, 1, "n", 1.0f, 1 });
+    limit_order_sell b2({ 2, 1, "n", 1.0f, 1, order_side::sell, order_type::limit });
     bq.put_order(b2);
 
     assert(bq.size() == 2);
@@ -473,10 +489,10 @@ void basic_sell_queue_tests()
   }
   {
     limit_order_sell_queue bq;
-    limit_order_sell b1({ 1, 2, "n", 1.0f, 1 });
+    limit_order_sell b1({ 1, 2, "n", 1.0f, 1, order_side::sell, order_type::limit });
     bq.put_order(b1);
 
-    limit_order_sell b2({ 2, 1, "n", 1.0f, 1 });
+    limit_order_sell b2({ 2, 1, "n", 1.0f, 1, order_side::sell, order_type::limit });
     bq.put_order(b2);
 
     assert(bq.size() == 2);
@@ -489,10 +505,10 @@ void basic_sell_queue_tests()
   }
   {
     limit_order_sell_queue bq;
-    limit_order_sell b1({ 1, 1, "n", 2.0f, 1 });
+    limit_order_sell b1({ 1, 1, "n", 2.0f, 1, order_side::sell, order_type::limit });
     bq.put_order(b1);
 
-    limit_order_sell b2({ 2, 1, "n", 1.0f, 1 });
+    limit_order_sell b2({ 2, 1, "n", 1.0f, 1, order_side::sell, order_type::limit });
     bq.put_order(b2);
 
     assert(bq.size() == 2);
@@ -504,12 +520,6 @@ void basic_sell_queue_tests()
     }
   }
 }
-
-enum class order_type : int {
-    market
-  , limit
-  , limit_ioc
-};
 
 template <typename E>
 constexpr auto to_underlying(E e) noexcept
@@ -535,6 +545,50 @@ public:
  
     return ret;
   }
+
+  bool amend_order(const order_data& od)
+  {
+    {
+      auto res = try_amend_order_in_limit_queue(m_limit_buy_queue, od);
+      switch (res) {
+      case amend_result::failed:
+        return false;
+      case amend_result::ok:
+        return true;
+      };
+    }
+    {
+      auto res = try_amend_order_in_limit_queue(m_limit_sell_queue, od);
+      switch (res) {
+      case amend_result::failed:
+        return false;
+      case amend_result::ok:
+        return true;
+      };
+    }
+    {
+      auto res = try_amend_order_in_market_queue(m_market_order_buy_cont, od);
+      switch (res) {
+      case amend_result::failed:
+        return false;
+      case amend_result::ok:
+        return true;
+      };
+    }
+    {
+      auto res = try_amend_order_in_market_queue(m_market_order_sell_cont, od);
+      switch (res) {
+      case amend_result::failed:
+        return false;
+      case amend_result::ok:
+        return true;
+      };
+    }
+    return false;
+  }
+
+  
+
   void run_matching()
   {
     {
@@ -626,6 +680,96 @@ public:
     }
   }
 private:
+  enum class amend_result {
+    not_found
+    , failed
+    , ok
+  };
+
+  template <class Q>
+  amend_result try_amend_order_in_market_queue(Q& q, const order_data& new_order_data) const
+  {
+    auto iter = q.find(new_order_data.get_id());
+    if (iter == q.end()) {
+      return amend_result::not_found;
+    }
+    auto amend_typ = check_amend_type(iter->second.get_data(), new_order_data);
+    switch (amend_typ) {
+    case amend_type::invalid:
+      return amend_result::failed;
+    case amend_type::q:
+      iter->second.set_q(new_order_data.get_q());
+      break;
+    case amend_type::price:
+      iter->second.set_price(new_order_data.get_price());
+      break;
+    case amend_type::price_and_q:
+      iter->second.set_q(new_order_data.get_q());
+      iter->second.set_price(new_order_data.get_price());
+      break;
+    }
+    return amend_result::ok;
+  }
+
+  template <class Q>
+  amend_result try_amend_order_in_limit_queue(Q& q, const order_data& new_order_data) const
+  {
+    auto iter = q.find_order_iter(new_order_data.get_id());
+    if (iter == q.end()) {
+      return amend_result::not_found;
+    }
+    auto amend_typ = check_amend_type(iter->second.get_data(), new_order_data);
+    switch(amend_typ) {
+    case amend_type::invalid:
+      return amend_result::failed;
+    case amend_type::q:
+      iter->second.set_q(new_order_data.get_q());
+      break;
+    case amend_type::price:
+    case amend_type::price_and_q:
+    {
+      auto new_data_to_set = iter->second.get_data();
+      new_data_to_set.set_price(new_order_data.get_price());
+      if (amend_typ == amend_type::price_and_q) {
+        new_data_to_set.set_q(new_order_data.get_q());
+      }
+      // remove the order
+      q.cancel_order(new_data_to_set.get_id());
+      // put it again
+      q.put_order(new_data_to_set);
+    }
+    }
+    return amend_result::ok;
+  }
+
+  enum class amend_type {
+      invalid
+    , q
+    , price
+    , price_and_q
+  };
+  amend_type check_amend_type(const order_data& old_data, const order_data& new_data) const
+  {
+    if (old_data.get_id() != new_data.get_id()) {
+      return amend_type::invalid;
+    }
+    if (old_data.get_order_side() != new_data.get_order_side()) {
+      return amend_type::invalid;
+    }
+    if (old_data.get_order_type() != new_data.get_order_type()) {
+      return amend_type::invalid;
+    }
+    if (old_data.get_price() != new_data.get_price()) {
+      if (old_data.get_q() != new_data.get_q()) {
+        return amend_type::price_and_q;
+      }
+      return amend_type::price;
+    }
+    if (old_data.get_q() != new_data.get_q()) {
+      return amend_type::q;
+    }
+    return amend_type::invalid;
+  }
   bool id_exists(uint64_t id) const
   {
     // check all queues for the id
@@ -644,6 +788,7 @@ private:
     }
     return false;
   }
+  
   bool put_order_sell_market(const order_data& d)
   {
     auto ret = m_market_order_sell_cont.put_order(d);
@@ -693,7 +838,199 @@ private:
   std::array<std::array<std::function<bool(const order_data&)>, 3>, 2> m_put_func;
 };
 
-//order_data
+class parse_error
+{
+public:
+  virtual std::string get_msg() const = 0;
+};
+
+class dummy_parse_error : public parse_error
+{
+public:
+  std::string get_msg() const override
+  {
+    assert(false);
+    return std::string("");
+  }
+};
+
+class new_parse_error : public parse_error
+{
+public:
+  new_parse_error(uint64_t order_id)
+    :m_order_id(order_id)
+  {
+
+  }
+  std::string get_msg() const override
+  {
+    std::string msg;
+    msg += '<';
+    msg += std::to_string(m_order_id);
+    msg += "> - Reject - 303 - Invalid order details";
+    return msg;
+  }
+private:
+  uint64_t m_order_id;
+};
+
+class amend_not_found_error : public parse_error
+{
+public:
+  amend_not_found_error(uint64_t order_id)
+    :m_order_id(order_id)
+  {
+
+  }
+  std::string get_msg() const override
+  {
+    std::string msg;
+    msg += '<';
+    msg += std::to_string(m_order_id);
+    msg += "> - AmendReject - 404 - Order does not exist";
+    return msg;
+  }
+private:
+  uint64_t m_order_id;
+};
+
+class amend_parse_error : public parse_error
+{
+public:
+  amend_parse_error(uint64_t order_id)
+    :m_order_id(order_id)
+  {
+
+  }
+  std::string get_msg() const override
+  {
+    std::string msg;
+    msg += '<';
+    msg += std::to_string(m_order_id);
+    msg += "> - AmendReject - 404 - Invalid amendment details";
+    return msg;
+  }
+private:
+  uint64_t m_order_id;
+};
+
+class order_engines //: public 
+{
+public:
+  void add_order_from_order_data(const order_data& od)
+  {
+    if (od.get_time() < m_current_time) {
+      throw new_parse_error(od.get_id());
+    }
+    m_current_time = od.get_time();
+    auto res = m_engines[od.get_symbol()].put_order(od, od.get_order_side(), od.get_order_type());
+    if (res == false) {
+      throw new_parse_error(od.get_id());
+    }
+
+    m_symbols[od.get_id()] = od.get_symbol();
+  }
+  void amend_order_from_order_data(const order_data& od)
+  {
+    if (od.get_time() < m_current_time) {
+      throw amend_parse_error(od.get_id());
+    }
+    m_current_time = od.get_time();
+
+    auto symbol_iter = m_symbols.find(od.get_id());
+    if (symbol_iter == m_symbols.end()) {
+      throw amend_not_found_error(od.get_id());
+    }
+    if (symbol_iter->second != od.get_symbol()) {
+      throw amend_parse_error(od.get_id());
+    }
+    auto engine_iter = m_engines.find(od.get_symbol());
+    assert(engine_iter != m_engines.end());
+    bool amend_res = engine_iter->second.amend_order(od);
+    if (!amend_res) {
+      throw amend_parse_error(od.get_id());
+    }
+  }
+
+private:
+  uint32_t m_current_time = 0;
+  std::unordered_map<std::string, order_engine> m_engines;
+  std::unordered_map<uint64_t, std::string> m_symbols;
+};
+
+
+std::vector<std::string> split_string(const std::string& line)
+{
+  std::vector<std::string> tokens;
+  std::string token;
+  std::istringstream tokenStream(line);
+  while (std::getline(tokenStream, token, ','))
+  {
+    tokens.push_back(token);
+  }
+  return tokens;
+}
+
+order_type string_to_order_type(const std::string& s)
+{
+  if (s.length() != 1) {
+    throw dummy_parse_error();
+  }
+  switch (s[0]) {
+  case 'M' :
+    return order_type::market;
+  case 'L':
+    return order_type::limit;
+  case 'I':
+    return order_type::limit_ioc;
+  }
+  throw dummy_parse_error();
+}
+
+order_side string_to_order_side(const std::string& s)
+{
+  if (s.length() != 1) {
+    throw dummy_parse_error();
+  }
+
+  switch (s[0]) {
+  case 'S':
+    return order_side::sell;
+  case 'B':
+    return order_side::buy;
+  }
+
+  throw dummy_parse_error();
+}
+
+order_data parse_new_order_string(const std::string& line)
+{
+  auto tok = split_string(line);
+  assert(tok.size() == 8);
+
+  uint64_t order_id = std::stoull(tok[1]);
+  try {
+    uint32_t time_stamp = std::stoul(tok[2]);
+    std::string symb = tok[3];
+    order_type ord_type = string_to_order_type(tok[4]);
+    order_side ord_side = string_to_order_side(tok[5]);
+    float price = std::stof(tok[6]);
+    uint64_t q = std::stoull(tok[7]);
+
+    return order_data(order_id, time_stamp, symb, price, q, ord_side, ord_type);
+  }
+  catch (const dummy_parse_error&) {
+    throw new_parse_error(order_id);
+  }
+  catch (const std::exception&) {
+    throw new_parse_error(order_id);
+  }
+}
+
+order_data parse_amend_order_string(const std::string& line)
+{
+  return parse_new_order_string(line);
+}
 
 int main()
 {
@@ -701,24 +1038,36 @@ int main()
   basic_buy_queue_tests();
   basic_sell_queue_tests();
 
+  order_engines engines;
+
   std::string line;
   while (std::getline(std::cin, line)) {
     if (line.size() == 0) {
       assert(false);
     }
-    switch (line[0]) {
-    case 'N':
-      break;
-    case 'A':
-      break;
-    case 'X':
-      break;
-    case 'M':
-      break;
-    case 'Q':
-      break;
+    try {
+      switch (line[0]) {
+      case 'N': {
+        order_data od = parse_new_order_string(line);
+        engines.add_order_from_order_data(od);
+        break;
+      }
+      case 'A': {
+        order_data od = parse_amend_order_string(line);
+        engines.amend_order_from_order_data(od);
+        break;
+      }
+      case 'X':
+        break;
+      case 'M':
+        break;
+      case 'Q':
+        break;
+      }
+    }
+    catch (const parse_error& err) {
+      std::cerr << err.get_msg() << '\n';
     }
   }
 
-  order_engine eng;
 }
