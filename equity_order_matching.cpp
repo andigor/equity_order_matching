@@ -28,6 +28,21 @@ enum class order_type : int {
   , limit_ioc
 };
 
+char order_type_to_char(order_type ot)
+{
+  if (ot == order_type::market) {
+    return 'M';
+  }
+  if (ot == order_type::limit) {
+    return 'L';
+  }
+  if (ot == order_type::limit_ioc) {
+    return 'I';
+  }
+  assert(false);
+  return 'E';
+}
+
 class order_data
 {
 public:
@@ -141,6 +156,7 @@ public:
   {
     m_order_data.set_price(p);
   }
+
 private:
   order_data m_order_data;
   bool m_ioc = false;
@@ -209,6 +225,14 @@ struct match_result
   bool no_match() const
   {
     return m_count_buy == 0 && m_count_sell == 0;
+  }
+
+  uint64_t get_matched_count() const
+  {
+    if (m_count_buy) {
+      return m_count_buy;
+    }
+    return m_count_sell;
   }
 };
 
@@ -536,6 +560,67 @@ constexpr auto to_underlying(E e) noexcept
   return static_cast<std::underlying_type_t<E>>(e);
 }
 
+struct matched_result_detail
+{
+  struct matched_buy {
+    uint64_t m_order_id;
+    order_type m_order_type;
+    uint64_t m_q;
+    float m_price;
+
+    std::string to_string() const
+    {
+      std::string ret;
+
+      ret += std::to_string(m_order_id);
+      ret += ',';
+      ret += order_type_to_char(m_order_type);
+      ret += ',';
+      ret += std::to_string(m_q);
+      ret += ',';
+      ret += std::to_string(m_price);
+
+      return ret;
+    }
+  };
+  struct matched_sell {
+    float m_price;
+    uint64_t m_q;
+    order_type m_order_type;
+    uint64_t m_id;
+
+    std::string to_string() const
+    {
+      std::string ret;
+
+      ret += std::to_string(m_price);
+      ret += ',';
+      ret += std::to_string(m_q);
+      ret += ',';
+      ret += order_type_to_char(m_order_type);
+      ret += ',';
+      ret += std::to_string(m_id);
+      return ret;
+    }
+  };
+
+  matched_buy m_matched_buy;
+  matched_sell m_matched_sell;
+
+  std::string to_string(const std::string& symb) const
+  {
+    std::string ret;
+
+    ret += symb;
+    ret += '|';
+    ret += m_matched_buy.to_string();
+    ret += '|';
+    ret += m_matched_sell.to_string();
+
+    return ret;
+  }
+};
+
 class order_engine
 {
 public:
@@ -613,8 +698,9 @@ public:
     return false;
   }
 
-  void run_matching()
+  std::vector<matched_result_detail> run_matching()
   {
+    std::vector<matched_result_detail> ret;
     {
       // first check market orders
       std::vector<market_order_buy_cont::iterator> market_buy_orders_to_remove;
@@ -687,6 +773,8 @@ public:
         if (match_result.no_match()) {
           break;
         }
+        auto matched_count = match_result.get_matched_count();
+        ret.push_back(fill_details(sell_order, buy_order, matched_count));
         if (match_result.m_count_buy) {
           // buy order fully matched
           m_limit_buy_queue.pop_order();
@@ -702,9 +790,25 @@ public:
       m_limit_buy_queue.drop_ioc();
       m_limit_sell_queue.drop_ioc();
     }
+    return ret;
   }
 private:
+  matched_result_detail fill_details(const order_sell& sell_order, const order_buy& buy_order, uint64_t matched_count) const
+  {
+    matched_result_detail det;
 
+    det.m_matched_buy.m_order_id = buy_order.get_id();
+    det.m_matched_buy.m_order_type = buy_order.get_data().get_order_type();
+    det.m_matched_buy.m_price = buy_order.get_price();
+    det.m_matched_buy.m_q = matched_count;
+
+    det.m_matched_sell.m_id = sell_order.get_id();
+    det.m_matched_sell.m_order_type = sell_order.get_data().get_order_type();
+    det.m_matched_sell.m_price = sell_order.get_price();
+    det.m_matched_sell.m_q = matched_count;
+
+    return det;
+  }
   enum class amend_result {
     not_found
     , failed
@@ -1005,17 +1109,21 @@ public:
     assert(eng_iter != m_engines.end());
     return eng_iter->second.cancel_order(id);
   }
-  void match_one(const std::string& symb)
+  std::vector<matched_result_detail> match_one(const std::string& symb)
   {
     auto iter = m_engines.find(symb);
     assert(iter != m_engines.end());
-    iter->second.run_matching();
+    auto ret = iter->second.run_matching();
+    return ret;
   }
-  void match_all()
+  std::vector<matched_result_detail> match_all()
   {
+    std::vector<matched_result_detail> ret;
     for (auto& eng : m_engines) {
-      eng.second.run_matching();
+      auto cur = eng.second.run_matching();
+      ret.insert(ret.end(), cur.begin(), cur.end());
     }
+    return ret;
   }
 private:
   uint32_t m_current_time = 0;
