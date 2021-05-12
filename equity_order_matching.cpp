@@ -727,6 +727,10 @@ public:
         market_buy_order.set_price(best_price);
         auto& sell_order = m_limit_sell_queue.top_order();
         auto match_result = match_limit_orders(market_buy_order, sell_order);
+
+        auto matched_count = match_result.get_matched_count();
+        ret.push_back(fill_details(sell_order, market_buy_order, matched_count));
+
         if (match_result.m_count_buy) {
           // buy market buy order is fully matched, move to the next market buy order
           market_buy_orders_to_remove.push_back(buy_iter);
@@ -757,6 +761,10 @@ public:
         auto& buy_order = m_limit_buy_queue.top_order();
 
         auto match_result = match_limit_orders(buy_order, market_sell_order);
+
+        auto matched_count = match_result.get_matched_count();
+        ret.push_back(fill_details(market_sell_order, buy_order, matched_count));
+
         if (match_result.m_count_buy) {
           // buy market buy order is fully matched, move to the next market buy order
 
