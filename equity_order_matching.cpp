@@ -1231,7 +1231,7 @@ uint64_t parse_cancel_string(const std::string& line)
   auto tok = split_string(line);
   assert(tok.size() == 3);
 
-  auto id = std::stoull(tok[2]);
+  auto id = std::stoull(tok[1]);
   return id;
 }
 
