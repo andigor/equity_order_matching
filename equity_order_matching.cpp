@@ -1092,6 +1092,7 @@ public:
     }
 
     m_symbols[od.get_id()] = od.get_symbol();
+    std::cout << od.get_id() << " - Accept\n";
   }
   void amend_order_from_order_data(const order_data& od)
   {
@@ -1113,6 +1114,7 @@ public:
     if (!amend_res) {
       throw amend_parse_error(od.get_id());
     }
+    std::cout << od.get_id() << " - AmendAccept\n";
   }
   void cancel_order(uint64_t id)
   {
