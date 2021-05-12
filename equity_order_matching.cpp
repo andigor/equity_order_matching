@@ -805,6 +805,54 @@ public:
     }
     return ret;
   }
+  void dump_data(uint64_t time)
+  {
+    if (time == 0) {
+      auto limit_buy_queue_iter = m_limit_buy_queue.begin();
+      auto limit_sell_queue_iter = m_limit_sell_queue.begin();
+      for (size_t i = 0; i < 5; ++i) {
+        std::string symb;
+        std::string buy_state;
+        if (limit_buy_queue_iter != m_limit_buy_queue.end()) {
+          symb = limit_buy_queue_iter->second.get_data().get_symbol();
+
+          buy_state += std::to_string(limit_buy_queue_iter->second.get_id());
+          buy_state += ',';
+          buy_state += order_type_to_char(limit_buy_queue_iter->second.get_data().get_order_type());
+          buy_state += ',';
+          buy_state += std::to_string(limit_buy_queue_iter->second.get_q());
+          buy_state += ',';
+          buy_state += float_to_string(limit_buy_queue_iter->second.get_price());
+
+          ++limit_buy_queue_iter;
+        }
+
+        std::string sell_state;
+        if (limit_sell_queue_iter != m_limit_sell_queue.end()) {
+          symb = limit_sell_queue_iter->second.get_data().get_symbol();
+
+          sell_state += float_to_string(limit_sell_queue_iter->second.get_price());
+          sell_state += ',';
+          sell_state += std::to_string(limit_sell_queue_iter->second.get_q());
+          sell_state += ',';
+          sell_state += order_type_to_char(limit_sell_queue_iter->second.get_data().get_order_type());
+          sell_state += ',';
+          sell_state += std::to_string(limit_sell_queue_iter->second.get_id());
+
+          ++limit_sell_queue_iter;
+        }
+        if (!symb.empty()) {
+          std::cout << symb << '|' << buy_state << '|' << sell_state << '\n';
+        }
+        else {
+          break;
+        }
+      }
+    }
+    else {
+      // search for a specific time
+    }
+  }
 private:
   matched_result_detail fill_details(const order_sell& sell_order, const order_buy& buy_order, uint64_t matched_count) const
   {
@@ -1077,6 +1125,43 @@ public:
 private:
   uint64_t m_order_id;
 };
+
+class query_data
+{
+public:
+  query_data()
+  {
+
+  }
+  query_data(const std::string& symb)
+    :m_symbol(symb)
+  {
+
+  }
+  query_data(uint32_t time)
+    :m_timestamp(time)
+  {
+
+  }
+  query_data(const std::string& symb, uint32_t time)
+    :m_symbol(symb)
+    , m_timestamp(time)
+  {
+
+  }
+  std::string get_symb() const
+  {
+    return m_symbol;
+  }
+  uint32_t get_timestamp() const
+  {
+    return m_timestamp;
+  }
+private:
+  std::string m_symbol;
+  uint32_t    m_timestamp = 0;
+};
+
 class order_engines //: public 
 {
 public:
@@ -1145,6 +1230,21 @@ public:
       ret.insert(ret.end(), cur.begin(), cur.end());
     }
     return ret;
+  }
+  void dump_data(const query_data& q)
+  {
+    auto symb = q.get_symb();
+    auto time = q.get_timestamp();
+    if (symb.empty()) {
+      for (auto& eng : m_engines) {
+        eng.second.dump_data(time);
+      }
+    }
+    else {
+      auto iter = m_engines.find(symb);
+      assert(iter != m_engines.end());
+      iter->second.dump_data(time);
+    }
   }
 private:
   uint32_t m_current_time = 0;
@@ -1248,6 +1348,45 @@ std::string parse_match_string(const std::string& line)
   return std::string();
 }
 
+query_data parse_query_string(const std::string& s)
+{
+  auto tok = split_string(s);
+  if (tok.empty()) {
+    assert(false);
+  }
+  if (tok.size() == 1) {
+    return query_data{};
+  }
+  if (tok.size() == 2) {
+    try {
+      uint32_t time = std::stoul(tok[1]);
+      return query_data{time};
+    }
+    catch (...) {
+      // if cannot convert to number, then it is symbol name
+      return query_data{ tok[1] };
+    }
+  }
+  if (tok.size() == 3) {
+    try {
+      uint32_t time = std::stoul(tok[1]);
+      std::string symb = tok[2];
+      return query_data(symb, time);
+    }
+    catch (...) {
+      // if not able to convert to number, try other way around
+    }
+    try {
+      uint32_t time = std::stoul(tok[2]);
+      std::string symb = tok[1];
+      return query_data(symb, time);
+    }
+    catch (...) {
+      assert(false);
+    }
+  }
+  return query_data{};
+}
 
 int main()
 {
@@ -1301,7 +1440,11 @@ int main()
         break;
       }
       case 'Q':
+      {
+        query_data d = parse_query_string(line);
+        engines.dump_data(d);
         break;
+      }
       }
     }
     catch (const parse_error& err) {
