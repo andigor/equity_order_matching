@@ -395,7 +395,7 @@ public:
     this->erase(iter);
   }
 
-  using queue_iter = std::multimap<order_data_key, Ord, Cmp>::iterator;
+  using queue_iter = typename std::multimap<order_data_key, Ord, Cmp>::iterator;
   queue_iter find_order_iter(uint64_t ord_id)
   {
     auto iter = m_ids.find(ord_id);
