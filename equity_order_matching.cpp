@@ -192,10 +192,10 @@ struct limit_order_buy_less
 {
   bool operator()(const order_data_key& k1, const order_data_key& k2) const
   {
-    if (k1.m_price > k2.m_price) {
+    if (k1.m_price < k2.m_price) {
       return false;
     }
-    if (k1.m_price < k2.m_price) {
+    if (k1.m_price > k2.m_price) {
       return true;
     }
     return k1.m_time < k2.m_time;
@@ -498,9 +498,9 @@ void basic_buy_queue_tests()
     assert(bq.size() == 2);
     {
       auto iter = bq.begin();
-      assert(iter->second.get_id() == 2);
-      ++iter;
       assert(iter->second.get_id() == 1);
+      ++iter;
+      assert(iter->second.get_id() == 2);
     }
   }
 }
