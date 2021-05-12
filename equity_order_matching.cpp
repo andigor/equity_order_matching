@@ -392,6 +392,7 @@ public:
   {
     assert(!this->empty());
     auto iter = this->begin();
+    m_ids.erase(iter->second.get_id());
     this->erase(iter);
   }
 
