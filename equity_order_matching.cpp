@@ -1114,7 +1114,7 @@ public:
       throw amend_parse_error(od.get_id());
     }
   }
-  bool cancel_order(uint64_t id)
+  void cancel_order(uint64_t id)
   {
     auto symb_iter = m_symbols.find(id);
     if (symb_iter == m_symbols.end()) {
@@ -1122,7 +1122,11 @@ public:
     }
     auto eng_iter = m_engines.find(symb_iter->second);
     assert(eng_iter != m_engines.end());
-    return eng_iter->second.cancel_order(id);
+    auto res = eng_iter->second.cancel_order(id);
+    if (!res) {
+      throw cancel_not_found_error(id);
+    }
+    std::cout << id << " - CancelAccept\n";
   }
   std::vector<matched_result_detail> match_one(const std::string& symb)
   {
