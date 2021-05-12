@@ -862,7 +862,7 @@ private:
 
     det.m_matched_buy.m_order_id = buy_order.get_id();
     det.m_matched_buy.m_order_type = buy_order.get_data().get_order_type();
-    det.m_matched_buy.m_price = buy_order.get_price();
+    det.m_matched_buy.m_price = sell_order.get_price();//buy_order.get_price();
     det.m_matched_buy.m_q = matched_count;
 
     det.m_matched_sell.m_id = sell_order.get_id();
