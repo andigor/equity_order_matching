@@ -399,6 +399,9 @@ public:
   queue_iter find_order_iter(uint64_t ord_id)
   {
     auto iter = m_ids.find(ord_id);
+    if (iter == m_ids.end()) {
+      return this->end();
+    }
     return iter->second;
   }
 private:
