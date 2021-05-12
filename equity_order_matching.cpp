@@ -560,6 +560,15 @@ constexpr auto to_underlying(E e) noexcept
   return static_cast<std::underlying_type_t<E>>(e);
 }
 
+std::string float_to_string(float val)
+{
+  std::ostringstream str;
+  str.precision(2);
+  str.setf(std::ios::fixed, std::ios::floatfield);
+  str << val;
+  return str.str();
+}
+
 struct matched_result_detail
 {
   std::string m_symb;
@@ -579,7 +588,7 @@ struct matched_result_detail
       ret += ',';
       ret += std::to_string(m_q);
       ret += ',';
-      ret += std::to_string(m_price);
+      ret += float_to_string(m_price);
 
       return ret;
     }
@@ -594,7 +603,7 @@ struct matched_result_detail
     {
       std::string ret;
 
-      ret += std::to_string(m_price);
+      ret += float_to_string(m_price);
       ret += ',';
       ret += std::to_string(m_q);
       ret += ',';
