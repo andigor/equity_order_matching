@@ -1260,6 +1260,8 @@ int main()
   order_engines engines;
   
   std::string line;
+  // skip first line
+  std::getline(std::cin, line);
   while (std::getline(std::cin, line)) {
     if (line.size() == 0) {
       assert(false);
