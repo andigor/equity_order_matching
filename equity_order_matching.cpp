@@ -1057,9 +1057,8 @@ public:
   std::string get_msg() const override
   {
     std::string msg;
-    msg += '<';
     msg += std::to_string(m_order_id);
-    msg += "> - Reject - 303 - Invalid order details";
+    msg += " - Reject - 303 - Invalid order details";
     return msg;
   }
 private:
@@ -1077,9 +1076,8 @@ public:
   std::string get_msg() const override
   {
     std::string msg;
-    msg += '<';
     msg += std::to_string(m_order_id);
-    msg += "> - AmendReject - 404 - Order does not exist";
+    msg += " - AmendReject - 404 - Order does not exist";
     return msg;
   }
 private:
@@ -1097,9 +1095,8 @@ public:
   std::string get_msg() const override
   {
     std::string msg;
-    msg += '<';
     msg += std::to_string(m_order_id);
-    msg += "> - AmendReject - 404 - Invalid amendment details";
+    msg += " - AmendReject - 404 - Invalid amendment details";
     return msg;
   }
 private:
@@ -1117,9 +1114,8 @@ public:
   std::string get_msg() const override
   {
     std::string msg;
-    msg += '<';
     msg += std::to_string(m_order_id);
-    msg += "> - CancelReject - 404 - Order does not exist";
+    msg += " - CancelReject - 404 - Order does not exist";
     return msg;
   }
 private:
