@@ -1194,7 +1194,7 @@ public:
     assert(engine_iter != m_engines.end());
     bool amend_res = engine_iter->second.amend_order(od);
     if (!amend_res) {
-      throw amend_parse_error(od.get_id());
+      throw amend_not_found_error(od.get_id());
     }
     std::cout << od.get_id() << " - AmendAccept\n";
   }
