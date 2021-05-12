@@ -1444,7 +1444,7 @@ int main()
       }
     }
     catch (const parse_error& err) {
-      std::cerr << err.get_msg() << '\n';
+      std::cout << err.get_msg() << '\n';
     }
   }
 
