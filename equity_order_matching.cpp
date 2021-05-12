@@ -636,7 +636,7 @@ public:
       return false;
     }
 
-    auto ret = m_put_func.at(to_underlying(ot)).at(to_underlying(os))(d);
+    auto ret = m_put_func.at(to_underlying(os)).at(to_underlying(ot))(d);
  
     return ret;
   }
@@ -1237,8 +1237,10 @@ int main()
   basic_buy_queue_tests();
   basic_sell_queue_tests();
 
-  order_engines engines;
+  //assert(false);
 
+  order_engines engines;
+  
   std::string line;
   while (std::getline(std::cin, line)) {
     if (line.size() == 0) {
