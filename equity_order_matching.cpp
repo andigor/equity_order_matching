@@ -842,7 +842,7 @@ public:
   }
   void dump_data(uint64_t time)
   {
-    if (time == 0) {
+    //if (time == 0) {
       auto limit_buy_queue_iter = m_limit_buy_queue.begin();
       auto limit_sell_queue_iter = m_limit_sell_queue.begin();
       for (size_t i = 0; i < 5; ++i) {
@@ -883,10 +883,55 @@ public:
           break;
         }
       }
-    }
-    else {
-      // search for a specific time
-    }
+    //}
+    //else {
+    //  // search for a specific time
+
+    //  auto limit_buy_queue_iter = m_limit_buy_queue.begin();
+    //  auto limit_sell_queue_iter = m_limit_sell_queue.begin();
+    //  for (;;) {
+    //    std::string symb;
+    //    std::string buy_state;
+    //    if (limit_buy_queue_iter != m_limit_buy_queue.end()) {
+    //      if (limit_buy_queue_iter->second.get_time() <= time) {
+    //        symb = limit_buy_queue_iter->second.get_data().get_symbol();
+
+    //        buy_state += std::to_string(limit_buy_queue_iter->second.get_id());
+    //        buy_state += ',';
+    //        buy_state += order_type_to_char(limit_buy_queue_iter->second.get_data().get_order_type());
+    //        buy_state += ',';
+    //        buy_state += std::to_string(limit_buy_queue_iter->second.get_q());
+    //        buy_state += ',';
+    //        buy_state += float_to_string(limit_buy_queue_iter->second.get_price());
+    //      }
+
+    //      ++limit_buy_queue_iter;
+    //    }
+
+    //    std::string sell_state;
+    //    if (limit_sell_queue_iter != m_limit_sell_queue.end()) {
+    //      if (limit_sell_queue_iter->second.get_time() <= time) {
+    //        symb = limit_sell_queue_iter->second.get_data().get_symbol();
+
+    //        sell_state += float_to_string(limit_sell_queue_iter->second.get_price());
+    //        sell_state += ',';
+    //        sell_state += std::to_string(limit_sell_queue_iter->second.get_q());
+    //        sell_state += ',';
+    //        sell_state += order_type_to_char(limit_sell_queue_iter->second.get_data().get_order_type());
+    //        sell_state += ',';
+    //        sell_state += std::to_string(limit_sell_queue_iter->second.get_id());
+    //      }
+    //      ++limit_sell_queue_iter;
+    //    }
+    //    if (!symb.empty()) {
+    //      std::cout << symb << '|' << buy_state << '|' << sell_state << '\n';
+    //    }
+    //    if (   limit_buy_queue_iter == m_limit_buy_queue.end() 
+    //        || limit_sell_queue_iter == m_limit_sell_queue.end()) {
+    //      break;
+    //    }
+    //  }
+    //}
   }
 private:
   matched_result_detail fill_details(const order_sell& sell_order, const order_buy& buy_order, uint64_t matched_count) const
@@ -1384,17 +1429,36 @@ uint64_t parse_cancel_string(const std::string& line)
   return id;
 }
 
-std::string parse_match_string(const std::string& line)
+struct match_command
+{
+  match_command(uint32_t t)
+    :m_time(t)
+  {
+
+  }
+  match_command() {
+
+  }
+  match_command(const std::string& s, uint32_t tim)
+    :m_symb(s)
+    ,m_time(tim)
+  {
+
+  }
+  std::string m_symb;
+  uint32_t m_time = 0;
+};
+match_command parse_match_string(const std::string& line)
 {
   auto tok = split_string(line);
   if (tok.size() == 2) {
-    return std::string();
+    return match_command{ std::stoul(tok[1]) };
   }
   else if (tok.size() == 3) {
-    return std::string(tok[2]);
+    return match_command(tok[2], std::stoul(tok[1]));
   }
   assert(false);
-  return std::string();
+  return match_command{};
 }
 
 query_data parse_query_string(const std::string& s)
@@ -1439,13 +1503,15 @@ query_data parse_query_string(const std::string& s)
 
 int main()
 {
-  basic_limit_orders_matching_tests();
-  basic_buy_queue_tests();
-  basic_sell_queue_tests();
+  //basic_limit_orders_matching_tests();
+  //basic_buy_queue_tests();
+  //basic_sell_queue_tests();
 
   //assert(false);
 
   order_engines engines;
+
+  std::unordered_map<uint32_t, order_engines> history;
   
   std::string line;
   // skip first line
@@ -1454,30 +1520,34 @@ int main()
     if (line.size() == 0) {
       assert(false);
     }
+    uint32_t time_stamp = 0;
     try {
       switch (line[0]) {
       case 'N': {
         order_data od = parse_new_order_string(line);
         engines.add_order_from_order_data(od);
+        time_stamp = od.get_time();
         break;
       }
       case 'A': {
         order_data od = parse_amend_order_string(line);
         engines.amend_order_from_order_data(od);
+        time_stamp = od.get_time();
         break;
       }
       case 'X':
       {
         uint64_t id = parse_cancel_string(line);
         engines.cancel_order(id);
+        //time_stamp = od.get_time();
         break;
       }
       case 'M':
       {
-        std::string match_string = parse_match_string(line);
+        match_command cmd  = parse_match_string(line);
         std::vector<matched_result_detail> result;
-        if (!match_string.empty()) {
-          result = engines.match_one(match_string);
+        if (!cmd.m_symb.empty()) {
+          result = engines.match_one(cmd.m_symb);
         }
         else {
           result = engines.match_all();
@@ -1486,12 +1556,21 @@ int main()
         for (const auto& res : result) {
           std::cout << res.to_string() << std::endl;
         }
+        time_stamp = cmd.m_time;
         break;
       }
       case 'Q':
       {
         query_data d = parse_query_string(line);
-        engines.dump_data(d);
+        if (d.get_timestamp() == 0) {
+          engines.dump_data(d);
+        }
+        else {
+          auto iter = history.find(d.get_timestamp());
+          if (iter != history.end()) {
+            iter->second.dump_data(d);
+          }
+        }
         break;
       }
       }
@@ -1499,6 +1578,7 @@ int main()
     catch (const parse_error& err) {
       std::cout << err.get_msg() << '\n';
     }
+    history[time_stamp] = engines;
   }
 
 }
