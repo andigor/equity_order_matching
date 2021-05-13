@@ -672,53 +672,53 @@ public:
     return ret;
   }
 
-  bool amend_order(const order_data& od)
+  amend_result amend_order(const order_data& od)
   {
     {
       auto res = try_amend_order_in_limit_queue(m_limit_buy_queue, od);
       switch (res) {
       case amend_result::failed:
-        return false;
       case amend_result::ok:
-        return true;
       case amend_result::executed:
-        return true;
+        return res;
+      case amend_result::not_found:
+        break;// continue
       };
     }
     {
       auto res = try_amend_order_in_limit_queue(m_limit_sell_queue, od);
       switch (res) {
       case amend_result::failed:
-        return false;
       case amend_result::ok:
-        return true;
       case amend_result::executed:
-        return true;
+        return res;
+      case amend_result::not_found:
+        break;// continue
       };
     }
     {
-      auto res = try_amend_order_in_market_queue(m_market_order_buy_cont, od);
+      auto res = try_amend_order_in_limit_queue(m_market_order_buy_cont, od);
       switch (res) {
       case amend_result::failed:
-        return false;
       case amend_result::ok:
-        return true;
       case amend_result::executed:
-        return true;
+        return res;
+      case amend_result::not_found:
+        break;// continue
       };
     }
     {
-      auto res = try_amend_order_in_market_queue(m_market_order_sell_cont, od);
+      auto res = try_amend_order_in_limit_queue(m_market_order_sell_cont, od);
       switch (res) {
       case amend_result::failed:
-        return false;
       case amend_result::ok:
-        return true;
       case amend_result::executed:
-        return true;
+        return res;
+      case amend_result::not_found:
+          break;
       };
     }
-    return false;
+    return amend_result::not_found;
   }
 
   bool cancel_order(uint64_t id)
@@ -952,12 +952,6 @@ private:
 
     return det;
   }
-  enum class amend_result {
-    not_found
-    , failed
-    , ok
-    , executed
-  };
 
   template <class Q>
   amend_result try_amend_order_in_market_queue(Q& q, const order_data& new_order_data) const
@@ -1194,7 +1188,7 @@ public:
   {
     std::string msg;
     msg += std::to_string(m_order_id);
-    msg += " - AmendReject - 404 - Invalid amendment details";
+    msg += " - AmendReject - 101 - Invalid amendment details";
     return msg;
   }
 private:
@@ -1289,10 +1283,12 @@ public:
     }
     auto engine_iter = m_engines.find(od.get_symbol());
     assert(engine_iter != m_engines.end());
-    bool amend_res = engine_iter->second.amend_order(od);
-    if (!amend_res) {
+    amend_result amend_res = engine_iter->second.amend_order(od);
+    if (amend_res == amend_result::not_found) {
       throw amend_not_found_error(od.get_id());
     }
+    else if (amend_res == amend_result::failed) {
+      throw amend_parse_error(od.get_id());
     std::cout << od.get_id() << " - AmendAccept\n";
   }
   void cancel_order(uint64_t id)
