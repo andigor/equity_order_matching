@@ -1420,13 +1420,20 @@ order_data parse_amend_order_string(const std::string& line)
   return parse_new_order_string(line);
 }
 
-uint64_t parse_cancel_string(const std::string& line)
+struct cancel_command
+{
+  uint64_t m_id;
+  uint32_t m_timestamp;
+};
+
+cancel_command parse_cancel_string(const std::string& line)
 {
   auto tok = split_string(line);
   assert(tok.size() == 3);
 
   auto id = std::stoull(tok[1]);
-  return id;
+  auto tim = std::stoul(tok[2]);
+  return {id, tim};
 }
 
 struct match_command
@@ -1537,9 +1544,9 @@ int main()
       }
       case 'X':
       {
-        uint64_t id = parse_cancel_string(line);
-        engines.cancel_order(id);
-        //time_stamp = od.get_time();
+        cancel_command cmd = parse_cancel_string(line);
+        engines.cancel_order(cmd.m_id);
+        time_stamp = cmd.m_timestamp;
         break;
       }
       case 'M':
@@ -1571,13 +1578,16 @@ int main()
           //  iter->second.dump_data(d);
           //}
           auto iter = history.lower_bound(d.get_timestamp());
-          if (iter != history.end()) {
-            if (iter->first > d.get_timestamp()) {
+          if (iter == history.end()) {
+            if (history.size() > 0) {
               --iter;
             }
-            if (iter != history.end()) {
-              iter->second.dump_data(d);
-            }
+          }
+          else if (iter->first > d.get_timestamp()) {
+            --iter;
+          }
+          if (iter != history.end()) {
+            iter->second.dump_data(d);
           }
         }
         break;
@@ -1587,7 +1597,9 @@ int main()
     catch (const parse_error& err) {
       std::cout << err.get_msg() << '\n';
     }
-    history[time_stamp] = engines;
+    if (time_stamp > 0) {
+      history[time_stamp] = engines;
+    }
   }
 
 }
