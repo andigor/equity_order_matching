@@ -67,6 +67,7 @@ public:
   {
     assert(q <= m_q);
     m_q -= q;
+    add_matched_q(q);
   }
   void reset_q()
   {
@@ -92,6 +93,14 @@ public:
   {
     return m_order_type;
   }
+  void set_time(uint32_t tim)
+  {
+    m_time = tim;
+  }
+  uint64_t get_matched_q() const
+  {
+    return m_matched_q;
+  }
 private:
   uint64_t m_id;
   uint32_t m_time;
@@ -100,6 +109,12 @@ private:
   uint64_t m_q;
   order_side m_order_side;
   order_type m_order_type;
+  uint64_t m_matched_q = 0;
+
+  void add_matched_q(uint64_t q)
+  {
+    m_matched_q += q;
+  }
 };
 
 
@@ -156,7 +171,10 @@ public:
   {
     m_order_data.set_price(p);
   }
-
+  uint64_t get_matched_q() const
+  {
+    return m_order_data.get_matched_q();
+  }
 private:
   order_data m_order_data;
   bool m_ioc = false;
@@ -663,6 +681,8 @@ public:
         return false;
       case amend_result::ok:
         return true;
+      case amend_result::executed:
+        return true;
       };
     }
     {
@@ -671,6 +691,8 @@ public:
       case amend_result::failed:
         return false;
       case amend_result::ok:
+        return true;
+      case amend_result::executed:
         return true;
       };
     }
@@ -681,6 +703,8 @@ public:
         return false;
       case amend_result::ok:
         return true;
+      case amend_result::executed:
+        return true;
       };
     }
     {
@@ -689,6 +713,8 @@ public:
       case amend_result::failed:
         return false;
       case amend_result::ok:
+        return true;
+      case amend_result::executed:
         return true;
       };
     }
@@ -885,6 +911,7 @@ private:
     not_found
     , failed
     , ok
+    , executed
   };
 
   template <class Q>
@@ -920,26 +947,35 @@ private:
       return amend_result::not_found;
     }
     auto amend_typ = check_amend_type(iter->second.get_data(), new_order_data);
-    switch(amend_typ) {
+    order_data cur_data = iter->second.get_data();
+
+    switch (amend_typ) {
     case amend_type::invalid:
       return amend_result::failed;
     case amend_type::q:
-      iter->second.set_q(new_order_data.get_q());
+      if (new_order_data.get_q() <= cur_data.get_matched_q()) {
+        q.cancel_order(cur_data.get_id());
+        return amend_result::executed;
+      }
+      cur_data.set_q(new_order_data.get_q() - cur_data.get_matched_q());
       break;
     case amend_type::price:
+      cur_data.set_price(new_order_data.get_price());
+      break;
     case amend_type::price_and_q:
-    {
-      auto new_data_to_set = iter->second.get_data();
-      new_data_to_set.set_price(new_order_data.get_price());
-      if (amend_typ == amend_type::price_and_q) {
-        new_data_to_set.set_q(new_order_data.get_q());
+      if (new_order_data.get_q() <= cur_data.get_matched_q()) {
+        q.cancel_order(cur_data.get_id());
+        return amend_result::executed;
       }
-      // remove the order
-      q.cancel_order(new_data_to_set.get_id());
-      // put it again
-      q.put_order(new_data_to_set);
-    }
-    }
+      cur_data.set_q(new_order_data.get_q() - cur_data.get_matched_q());
+      cur_data.set_price(new_order_data.get_price());
+      break;
+    };
+    //cur_data.set_time(new_order_data.get_time());
+    // remove the order
+    q.cancel_order(cur_data.get_id());
+    // put it again
+    q.put_order(cur_data);
     return amend_result::ok;
   }
 
