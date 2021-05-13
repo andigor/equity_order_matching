@@ -1511,7 +1511,7 @@ int main()
 
   order_engines engines;
 
-  std::unordered_map<uint32_t, order_engines> history;
+  std::map<uint32_t, order_engines> history;
   
   std::string line;
   // skip first line
@@ -1566,9 +1566,18 @@ int main()
           engines.dump_data(d);
         }
         else {
-          auto iter = history.find(d.get_timestamp());
+          //auto iter = history.find(d.get_timestamp());
+          //if (iter != history.end()) {
+          //  iter->second.dump_data(d);
+          //}
+          auto iter = history.lower_bound(d.get_timestamp());
           if (iter != history.end()) {
-            iter->second.dump_data(d);
+            if (iter->first > d.get_timestamp()) {
+              --iter;
+            }
+            if (iter != history.end()) {
+              iter->second.dump_data(d);
+            }
           }
         }
         break;
