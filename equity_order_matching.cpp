@@ -1034,6 +1034,11 @@ private:
   };
   amend_type check_amend_type(const order_data& old_data, const order_data& new_data) const
   {
+    if (new_data.get_order_type() == order_type::market) {
+      if (new_data.get_price() != 0.0) {
+        return amend_type::invalid;
+      }
+    }
     if (old_data.get_id() != new_data.get_id()) {
       return amend_type::invalid;
     }
