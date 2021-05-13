@@ -953,14 +953,21 @@ private:
     case amend_type::invalid:
       return amend_result::failed;
     case amend_type::q:
+    {
       if (new_order_data.get_q() <= cur_data.get_matched_q()) {
         q.cancel_order(cur_data.get_id());
         return amend_result::executed;
       }
+      auto old_q = cur_data.get_q();
       cur_data.set_q(new_order_data.get_q() - cur_data.get_matched_q());
+      if (cur_data.get_q() > old_q) {
+        cur_data.set_time(new_order_data.get_time());
+      }
       break;
+    }
     case amend_type::price:
       cur_data.set_price(new_order_data.get_price());
+      cur_data.set_time(new_order_data.get_time());
       break;
     case amend_type::price_and_q:
       if (new_order_data.get_q() <= cur_data.get_matched_q()) {
@@ -969,6 +976,7 @@ private:
       }
       cur_data.set_q(new_order_data.get_q() - cur_data.get_matched_q());
       cur_data.set_price(new_order_data.get_price());
+      cur_data.set_time(new_order_data.get_time());
       break;
     };
     //cur_data.set_time(new_order_data.get_time());
