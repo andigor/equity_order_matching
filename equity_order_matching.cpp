@@ -1294,6 +1294,7 @@ public:
     }
     else if (amend_res == amend_result::failed) {
       throw amend_parse_error(od.get_id());
+    }
     std::cout << od.get_id() << " - AmendAccept\n";
   }
   void cancel_order(uint64_t id)
