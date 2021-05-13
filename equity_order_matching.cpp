@@ -653,6 +653,13 @@ struct matched_result_detail
   }
 };
 
+enum class amend_result {
+  not_found
+  , failed
+  , ok
+  , executed
+};
+
 class order_engine
 {
 public:
