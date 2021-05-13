@@ -439,37 +439,37 @@ public:
 };
 
 
-template <class Ord>
-class market_order_cont : public std::unordered_map<uint64_t, Ord>
-{
-public:
-  bool id_exists(uint64_t id) const
-  {
-    auto cnt = this->count(id);
-    if (cnt > 0) {
-      return true;
-    }
-    return false;
-  }
+//template <class Ord>
+//class market_order_cont : public std::unordered_map<uint64_t, Ord>
+//{
+//public:
+//  bool id_exists(uint64_t id) const
+//  {
+//    auto cnt = this->count(id);
+//    if (cnt > 0) {
+//      return true;
+//    }
+//    return false;
+//  }
+//
+//  bool put_order(const Ord& o)
+//  {
+//    auto ret = this->insert(std::make_pair(o.get_id(), o));
+//    return ret.second;
+//  }
+//  bool cancel_order(uint64_t id)
+//  {
+//    auto iter = this->find(id);
+//    if (iter == this->end()) {
+//      return false;
+//    }
+//    this->erase(iter);
+//    return true;
+//  }
+//};
 
-  bool put_order(const Ord& o)
-  {
-    auto ret = this->insert(std::make_pair(o.get_id(), o));
-    return ret.second;
-  }
-  bool cancel_order(uint64_t id)
-  {
-    auto iter = this->find(id);
-    if (iter == this->end()) {
-      return false;
-    }
-    this->erase(iter);
-    return true;
-  }
-};
-
-using market_order_buy_cont = market_order_cont<limit_order_buy>;
-using market_order_sell_cont = market_order_cont<limit_order_sell>;
+using market_order_buy_cont = limit_order_queue<limit_order_buy, limit_order_buy_less>;
+using market_order_sell_cont = limit_order_queue<limit_order_sell, limit_order_sell_less>;
 
 void basic_buy_queue_tests()
 {
@@ -962,7 +962,7 @@ private:
   template <class Q>
   amend_result try_amend_order_in_market_queue(Q& q, const order_data& new_order_data) const
   {
-    auto iter = q.find(new_order_data.get_id());
+    auto iter = q.find_order_iter(new_order_data.get_id());
     if (iter == q.end()) {
       return amend_result::not_found;
     }
