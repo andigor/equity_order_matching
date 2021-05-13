@@ -849,12 +849,29 @@ public:
   }
   void dump_data(uint64_t time)
   {
-    //if (time == 0) {
-      auto limit_buy_queue_iter = m_limit_buy_queue.begin();
-      auto limit_sell_queue_iter = m_limit_sell_queue.begin();
-      for (size_t i = 0; i < 5; ++i) {
-        std::string symb;
-        std::string buy_state;
+    auto limit_buy_queue_iter = m_limit_buy_queue.begin();
+    auto limit_sell_queue_iter = m_limit_sell_queue.begin();
+
+    auto market_buy_queue_iter = m_market_order_buy_cont.begin();
+    auto market_sell_queue_iter = m_market_order_sell_cont.begin();
+
+    for (size_t i = 0; i < 5; ++i) {
+      std::string symb;
+      std::string buy_state;
+      if (market_buy_queue_iter != m_market_order_buy_cont.end()) {
+        symb = market_buy_queue_iter->second.get_data().get_symbol();
+
+        buy_state += std::to_string(market_buy_queue_iter->second.get_id());
+        buy_state += ',';
+        buy_state += order_type_to_char(market_buy_queue_iter->second.get_data().get_order_type());
+        buy_state += ',';
+        buy_state += std::to_string(market_buy_queue_iter->second.get_q());
+        buy_state += ',';
+        buy_state += float_to_string(market_buy_queue_iter->second.get_price());
+
+        ++market_buy_queue_iter;
+      }
+      else {
         if (limit_buy_queue_iter != m_limit_buy_queue.end()) {
           symb = limit_buy_queue_iter->second.get_data().get_symbol();
 
@@ -868,8 +885,23 @@ public:
 
           ++limit_buy_queue_iter;
         }
+      }
 
-        std::string sell_state;
+      std::string sell_state;
+      if (market_sell_queue_iter != m_market_order_sell_cont.end()) {
+        symb = market_sell_queue_iter->second.get_data().get_symbol();
+
+        sell_state += float_to_string(market_sell_queue_iter->second.get_price());
+        sell_state += ',';
+        sell_state += std::to_string(market_sell_queue_iter->second.get_q());
+        sell_state += ',';
+        sell_state += order_type_to_char(market_sell_queue_iter->second.get_data().get_order_type());
+        sell_state += ',';
+        sell_state += std::to_string(market_sell_queue_iter->second.get_id());
+
+        ++market_sell_queue_iter;
+      }
+      else {
         if (limit_sell_queue_iter != m_limit_sell_queue.end()) {
           symb = limit_sell_queue_iter->second.get_data().get_symbol();
 
@@ -883,62 +915,14 @@ public:
 
           ++limit_sell_queue_iter;
         }
-        if (!symb.empty()) {
-          std::cout << symb << '|' << buy_state << '|' << sell_state << '\n';
-        }
-        else {
-          break;
-        }
       }
-    //}
-    //else {
-    //  // search for a specific time
-
-    //  auto limit_buy_queue_iter = m_limit_buy_queue.begin();
-    //  auto limit_sell_queue_iter = m_limit_sell_queue.begin();
-    //  for (;;) {
-    //    std::string symb;
-    //    std::string buy_state;
-    //    if (limit_buy_queue_iter != m_limit_buy_queue.end()) {
-    //      if (limit_buy_queue_iter->second.get_time() <= time) {
-    //        symb = limit_buy_queue_iter->second.get_data().get_symbol();
-
-    //        buy_state += std::to_string(limit_buy_queue_iter->second.get_id());
-    //        buy_state += ',';
-    //        buy_state += order_type_to_char(limit_buy_queue_iter->second.get_data().get_order_type());
-    //        buy_state += ',';
-    //        buy_state += std::to_string(limit_buy_queue_iter->second.get_q());
-    //        buy_state += ',';
-    //        buy_state += float_to_string(limit_buy_queue_iter->second.get_price());
-    //      }
-
-    //      ++limit_buy_queue_iter;
-    //    }
-
-    //    std::string sell_state;
-    //    if (limit_sell_queue_iter != m_limit_sell_queue.end()) {
-    //      if (limit_sell_queue_iter->second.get_time() <= time) {
-    //        symb = limit_sell_queue_iter->second.get_data().get_symbol();
-
-    //        sell_state += float_to_string(limit_sell_queue_iter->second.get_price());
-    //        sell_state += ',';
-    //        sell_state += std::to_string(limit_sell_queue_iter->second.get_q());
-    //        sell_state += ',';
-    //        sell_state += order_type_to_char(limit_sell_queue_iter->second.get_data().get_order_type());
-    //        sell_state += ',';
-    //        sell_state += std::to_string(limit_sell_queue_iter->second.get_id());
-    //      }
-    //      ++limit_sell_queue_iter;
-    //    }
-    //    if (!symb.empty()) {
-    //      std::cout << symb << '|' << buy_state << '|' << sell_state << '\n';
-    //    }
-    //    if (   limit_buy_queue_iter == m_limit_buy_queue.end() 
-    //        || limit_sell_queue_iter == m_limit_sell_queue.end()) {
-    //      break;
-    //    }
-    //  }
-    //}
+      if (!symb.empty()) {
+        std::cout << symb << '|' << buy_state << '|' << sell_state << '\n';
+      }
+      else {
+        break;
+      }
+    }
   }
 private:
   matched_result_detail fill_details(const order_sell& sell_order, const order_buy& buy_order, uint64_t matched_count) const
